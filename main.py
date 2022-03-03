@@ -1,6 +1,7 @@
 from typing import Optional
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Response, status, HTTPException
 from pydantic import BaseModel
+from random import randrange
 
 app = FastAPI()
 
@@ -13,8 +14,25 @@ class Post(BaseModel):
     rating: Optional[int] = None
 
 
+# Test data saved in memory... until setting up database
+my_posts = [{"title": "My first post in the food blog", "content": "This post is a test post for my new accout in food blog", "id": 1},
+{"title": "Why pizza is not a healthy choice for teenages", "content": "As vegan, I love pizza, however...", "id": 2}]
+
+# Not a best practice, but will do for now.
+def find_post(id):
+    for p in my_posts:
+        if p['id'] == id:
+            return p
+
+
+# For finding a post by index
+def find_index_post(id):
+    for i, p in enumerate(my_posts):
+        if p['id'] == id:
+            return i
+
 # Route/ path operation
-#decorator - without this, this won't be other than a normal python function
+# decorator - without this, this won't be other than a normal python function
 @app.get("/") # The path that we have to go to. Example: ("/login") to go to login page.
 
 #function
@@ -26,12 +44,35 @@ async def root():
 ## uvicorn main:app --reload can be used only when in development.
 ## @app.get("/"). The get is the method. the "/" is the path. What comes under is the function.
 
+
 @app.get("/posts")
 def get_posts():
-    return {"data":"This is your posts"}
+    return {"data":my_posts}
 
-@app.post("/posts") # Against best practices
-def create_posts(new_post: Post):
-    print(new_post.rating)
-    print(new_post.dict()) # A way to convert the data into a dictionary form.
-    return {"New post": f"New post"}
+
+@app.get("/posts/{id}")
+def get_post(id: int): # This will be checked to be integer and not a string.
+    post = find_post(id)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Post with id: {id} was not found")
+    return {"Post detail": post}
+
+
+@app.post("/posts", status_code=status.HTTP_201_CREATED) # Against best practices
+def create_posts(post: Post):
+    post_dict = post.dict()
+    post_dict['id'] = randrange(100, 100000)
+    my_posts.append(post_dict)
+    return {"New post": f"{post_dict}"}
+
+
+@app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(id: int):
+    # For deteting a post, find the index for the item
+    index = find_index_post(id)
+    if index == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Post with id: {id} does not exist.")
+    my_posts.pop(index)
+    return Response(status_code=status.HTTP_204_NO_CONTENT) # No data should be sent back when doing a delete.
