@@ -1,7 +1,11 @@
+from turtle import title
 from typing import Optional
 from fastapi import Body, FastAPI, Response, status, HTTPException
 from pydantic import BaseModel
 from random import randrange
+import psycopg2
+from  psycopg2.extras import RealDictCursor
+import time
 
 app = FastAPI()
 
@@ -12,6 +16,20 @@ class Post(BaseModel):
     content: str
     published: bool = True
     rating: Optional[int] = None
+
+for i in range(4): # Try to connect to database up to four times:
+
+    try:
+        conn = psycopg2.connect(host = 'localhost', database = 'fastapi', 
+        user = 'postgres', password = '1234', cursor_factory=RealDictCursor) # Temporary solution to hard code the connection values in code
+        cursor = conn.cursor()
+        print("Database connection was successful.")
+        break # Once a successful connection has been made, break out of the while loop.
+
+    except Exception as error:
+        print("Connection to database failed")
+        print("Error message: ", error)
+        time.sleep(2) # Wait for 2 seconds after failed attempt to connect to database
 
 
 # Test data saved in memory... until setting up database
@@ -47,7 +65,9 @@ async def root():
 
 @app.get("/posts")
 def get_posts():
-    return {"data":my_posts}
+    cursor.execute("""SELECT * FROM posts""")
+    posts = cursor.fetchall()
+    return {"data":posts}
 
 
 @app.get("/posts/{id}")
@@ -61,10 +81,12 @@ def get_post(id: int): # This will be checked to be integer and not a string.
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED) # Against best practices
 def create_posts(post: Post):
-    post_dict = post.dict()
-    post_dict['id'] = randrange(100, 100000)
-    my_posts.append(post_dict)
-    return {"New post": f"{post_dict}"}
+    # Below is a staged input that will be commited with conn.commit()
+    cursor.execute("""INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING * """,
+        (post.title, post.content, post.published)) # This is a sanitized SQL input. Order of input is important.
+    new_post = cursor.fetchone()
+    conn.commit() # All staged changes need to be commited
+    return {"New post": new_post}
 
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
