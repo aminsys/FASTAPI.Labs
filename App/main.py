@@ -1,13 +1,18 @@
-from turtle import title
 from typing import Optional
-from fastapi import Body, FastAPI, Response, status, HTTPException
+from fastapi import Body, FastAPI, Response, status, HTTPException, Depends
 from pydantic import BaseModel
 from random import randrange
 import psycopg2
 from  psycopg2.extras import RealDictCursor
 import time
+from sqlalchemy.orm import Session
+from . import models
+from .database import engine, get_db
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
 
 # Defning what a post should look like. Getting validation for free.
 # This way we can guarantee that the front end will send the type of data that we want.
@@ -57,6 +62,10 @@ def find_index_post(id):
 async def root():
     return {"message": "Hello Fast API 2.0.4"}
 
+@app.get("/sqlalchemy")
+def test_posts(db: Session = Depends(get_db)):
+    return {"Status": "Success"}
+
 ## uvicorn to start a server
 ## uvicorn main:app
 ## uvicorn main:app --reload can be used only when in development.
@@ -72,7 +81,8 @@ def get_posts():
 
 @app.get("/posts/{id}")
 def get_post(id: int): # This will be checked to be integer and not a string.
-    post = find_post(id)
+    cursor.execute("""SELECT * FROM posts WHERE id = %s """, (str(id),))
+    post = cursor.fetchone()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with id: {id} was not found")
@@ -91,24 +101,28 @@ def create_posts(post: Post):
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id: int):
-    # For deteting a post, find the index for the item
-    index = find_index_post(id)
-    if index == None:
+
+    # Add extra comma sign att the end to solve the issue: TypeError: not all arguments converted during string formatting.
+    cursor.execute("""DELETE FROM posts WHERE id = %s returning * """, (str(id),))
+    deleted_post = cursor.fetchone()
+    conn.commit()
+
+    if delete_post == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with id: {id} does not exist.")
-    my_posts.pop(index)
-    return Response(status_code=status.HTTP_204_NO_CONTENT) # No data should be sent back when doing a delete.
+    return {deleted_post: Response(status_code=status.HTTP_204_NO_CONTENT)} # No data should be sent back when doing a delete.
 
 
 # Creating a new path operation
 @app.put("/posts/{id}")
 def update_post(id: int, post: Post):
-    # Find the index of the post with the id:
-    index = find_index_post(id)
-    if index == None:
+    cursor.execute("""UPDATE posts SET title = %s, content = %s, published = %s WHERE id = %s RETURNING * """,
+    (post.title, post.content, post.published, str(id)))
+    updated_post = cursor.fetchone()
+    conn.commit()
+
+    if updated_post == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with id : {id} does not exist.")
-    post_dict = post.dict()
-    post_dict['id'] = id
-    my_posts[index] = post_dict
-    return {"Message": post_dict}
+
+    return {"Message": updated_post}
