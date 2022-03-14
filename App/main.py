@@ -1,13 +1,15 @@
+from multiprocessing import context
 from typing import Optional, List
 from fastapi import Body, FastAPI, Response, status, HTTPException, Depends
 from random import randrange
-import psycopg2
+from passlib.context import CryptContext
 from  psycopg2.extras import RealDictCursor
 import time
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import engine, get_db
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Hashing algorith we want to use
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -129,6 +131,10 @@ def update_post(id: int, post: schemas.PostCreate, db: Session = Depends(get_db)
 
 @app.post("/users", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut) # decorator
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+
+    # Hash the password - user.password
+    hashed_pw = pwd_context.hash(user.password)
+    user.password = hashed_pw # This will update the pydantic user model.
     new_user = models.User(**user.dict())
     db.add(new_user)
     db.commit()

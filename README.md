@@ -15,6 +15,7 @@ A comprehensive list (with version number) of the libraries/ modules that are us
 
 - anyio==3.5.0
 - asgiref==3.5.0
+- bcrypt==3.2.0 - For encrypting passwords
 - certifi==2021.10.8
 - charset-normalizer==2.0.12
 - click==8.0.4
@@ -30,6 +31,7 @@ A comprehensive list (with version number) of the libraries/ modules that are us
 - Jinja2==3.0.3
 - MarkupSafe==2.1.0
 - orjson==3.6.7 - Required if you want to use ORJSONResponse.
+- passlib==1.7.4
 - psycopg2==2.9.3 - Needed to talk to the database.
 - pydantic==1.9.0
 - python-dotenv==0.19.2
