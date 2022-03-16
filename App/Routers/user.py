@@ -3,7 +3,8 @@ from fastapi import status, HTTPException, Depends, APIRouter
 from ..database import engine, get_db
 from sqlalchemy.orm import Session
 
-# Creating a router obejct
+
+# Creating a router obejct which will be included in our main file
 router = APIRouter()
 
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut) # decorator
